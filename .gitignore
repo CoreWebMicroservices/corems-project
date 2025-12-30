@@ -1,0 +1,11 @@
+# Cloned service repositories
+services/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
