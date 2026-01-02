@@ -1,10 +1,11 @@
-# Cloned service repositories
-services/
+# Cloned repositories (each has own .git)
+repos/
+target/
+.env
 
 # IDE
 .idea/
 *.iml
-.vscode/
 
 # OS
 .DS_Store

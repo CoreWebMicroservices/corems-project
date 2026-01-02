@@ -1,0 +1,12 @@
+{
+  "git.autoRepositoryDetection": true,
+  "git.scanRepositories": [
+    "repos/common",
+    "repos/user-ms",
+    "repos/document-ms",
+    "repos/communication-ms",
+    "repos/translation-ms",
+    "repos/frontend",
+    "repos/parent"
+  ]
+}

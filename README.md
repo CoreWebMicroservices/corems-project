@@ -1,5 +1,6 @@
 # Core Microservices
 
+
 ## Overview
 
 Core Microservices provides a set of essential services to support startup applications 
@@ -13,7 +14,7 @@ It provides a growing set of ready-to-use backend services and frontend modules 
 Modern applications require:
 Authentication & authorization
 Document management
-Event-driven communication
+Communication
 Monitoring, observability, logging
 Frontend integration
 Scalability from day one
@@ -24,24 +25,33 @@ The project will include services like:
 - User Management - managing users, roles, and permissions.
 - Communication service - sending emails, SMS, and push notifications.
 - Document Management Service - managing documents, files, and attachments.
-- Localization Service - managing translations for multiple languages.
+- Translation Service - managing translations for multiple languages.
 - Template Service - managing email templates, SMS templates, and document templates in HTML format.
 - Form Service - managing questionnaires, surveys, and forms.
-- Payment Service - managing payments, invoices, and subscriptions.
-- Analytics Service - managing analytics, reports, and dashboards.
+- Payment Service - integrations with stripe, paypal, klarna, vips and more.
+- Billing Service - managing billing and subscription.
+
 
 More services will be added in the future to provide a complete set of services for a startup application.
 You can choose what services you need and integrate them into your application with further customization.
+
+Also Front End modular app to illustrate how to integrate the services into a frontend application. 
+Frontend app is modular and can be easy customized to fit your needs.
+
+## Why Core Microservices?
+
+Core Microservices provides a set of ready-to-use backend services and frontend modules that allow startups, small teams, and solo developers to launch production-quality systems without reinventing the architecture.
+
+It provides a growing set of ready-to-use backend services and frontend modules that allow startups, small teams, and solo developers to launch production-quality systems without reinventing the architecture.
 
 PLS NOTE: This project is still under development and not ready for production use.
 Contact me if you want to contribute or have any suggestions. 
 
 ## High level design
 
-![CoreMS High Level Architecture](design.png)
+![CoreMS High Level Architecture](docs/design.png)
 
 *Modular microservices architecture with shared infrastructure*
-
 
 
 ## Who is this for?
@@ -53,6 +63,8 @@ Contact me if you want to contribute or have any suggestions.
 - Students learning enterprise architecture
 
 If you want to start fast, scale safely, and keep your architecture clean, Core Microservices gives you the jump-start you need.
+
+And it is free to use.
 
 ## Documentation & Guides (Coming soon...)
 
@@ -67,7 +79,48 @@ Also will try to publish YouTube walking through videos.
 
 ## Setup
 
-TODO: Add setup instructions
+```bash
+# Clone the repository
+git clone https://github.com/CoreWebMicroservices/corems-project.git
+cd corems-project
+
+# Start infrastructure (PostgreSQL, RabbitMQ, MinIO)
+./setup.sh infra
+
+# Build and start all services
+./setup.sh start-all
+
+# Or start individual services
+./setup.sh build user-ms
+./setup.sh start user-ms
+```
+
+### Available Commands
+
+```bash
+# Infrastructure
+./setup.sh infra          # Start PostgreSQL, RabbitMQ, MinIO
+
+# Build operations
+./setup.sh build all      # Build all services
+./setup.sh build <service> # Build specific service
+
+# Service operations  
+./setup.sh start-all      # Start all services
+./setup.sh start <service> # Start specific service
+./setup.sh stop <service>  # Stop specific service
+./setup.sh logs <service>  # View service logs
+
+# Database
+./setup.sh migrate <service> # Run migrations for service
+```
+
+### Service URLs
+- **Frontend**: http://localhost:8080
+- **User Service**: http://localhost:3000
+- **Communication Service**: http://localhost:3001
+- **Document Service**: http://localhost:3002
+- **Translation Service**: http://localhost:3003
 
 ## Tech Stack
 

@@ -1,0 +1,61 @@
+{
+    "version": "0.1.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "User Service",
+            "request": "launch",
+            "mainClass": "com.corems.userms.app.UserServiceApplication",
+            "projectName": "user-service",
+            "cwd": "${workspaceFolder}/repos/user-ms",
+            "envFile": "${workspaceFolder}/repos/user-ms/.env"
+        },
+        {
+            "type": "java",
+            "name": "Communication Service",
+            "request": "launch",
+            "mainClass": "com.corems.communicationms.app.CommunicationServiceApplication",
+            "projectName": "communication-service",
+            "cwd": "${workspaceFolder}/repos/communication-ms",
+            "envFile": "${workspaceFolder}/repos/communication-ms/.env"
+        },
+        {
+            "type": "java",
+            "name": "Document Service",
+            "request": "launch",
+            "mainClass": "com.corems.documentms.app.DocumentServiceApplication",
+            "projectName": "document-service",
+            "cwd": "${workspaceFolder}/repos/document-ms",
+            "envFile": "${workspaceFolder}/repos/document-ms/.env"
+        },
+        {
+            "type": "java",
+            "name": "Translation Service",
+            "request": "launch",
+            "mainClass": "com.corems.translationms.app.TranslationServiceApplication",
+            "projectName": "translation-service",
+            "cwd": "${workspaceFolder}/repos/translation-ms",
+            "envFile": "${workspaceFolder}/repos/translation-ms/.env"
+        },
+        {
+            "type": "node-terminal",
+            "name": "Frontend Dev Server",
+            "request": "launch",
+            "command": "npm run dev",
+            "cwd": "${workspaceFolder}/repos/frontend"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "All Services",
+            "configurations": [
+                "User Service",
+                "Communication Service",
+                "Document Service",
+                "Translation Service",
+                "Frontend Dev Server"
+            ],
+            "stopAll": true
+        }
+    ]
+}

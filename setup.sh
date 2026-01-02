@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICES_DIR="$SCRIPT_DIR/services"
+REPOS_DIR="$SCRIPT_DIR/repos"
 DOCKER_DIR="$SCRIPT_DIR/docker"
 GITHUB_ORG="core-microservices"
 GITHUB_BASE="https://github.com/$GITHUB_ORG"
@@ -40,11 +40,11 @@ ensure_docker_network() {
     fi
 }
 
-check_docker_env() {
-    if [ ! -f "$DOCKER_DIR/.env" ]; then
-        log_error ".env file not found in docker/"
+check_env() {
+    if [ ! -f "$SCRIPT_DIR/.env" ]; then
+        log_error ".env file not found"
         log_warn "Copy .env-example to .env and configure it:"
-        echo "  cp docker/.env-example docker/.env"
+        echo "  cp .env-example .env"
         exit 1
     fi
 }
@@ -55,7 +55,7 @@ check_docker_env() {
 cmd_init() {
     log_info "Initializing Core Microservices..."
     
-    mkdir -p "$SERVICES_DIR"
+    mkdir -p "$REPOS_DIR"
     
     # Clone required repos
     log_info "Cloning required repositories..."
@@ -77,7 +77,7 @@ cmd_add() {
         exit 1
     fi
     
-    mkdir -p "$SERVICES_DIR"
+    mkdir -p "$REPOS_DIR"
     
     for service in "$@"; do
         clone_repo "$service"
@@ -87,20 +87,10 @@ cmd_add() {
 }
 
 cmd_list() {
-    echo "Available services:"
-    echo ""
-    echo "  parent            Parent POM - dependency management"
-    echo "  common            Shared libraries - security, logging, utils"
-    echo "  user-ms           User management - authentication, authorization"
-    echo "  document-ms       Document management - file storage, metadata"
-    echo "  communication-ms  Communication - emails, SMS, notifications"
-    echo "  translation-ms    Localization - i18n bundles"
-    echo "  frontend          Vue.js frontend application"
-    echo ""
     echo "Installed:"
-    if [ -d "$SERVICES_DIR" ]; then
+    if [ -d "$REPOS_DIR" ]; then
         local found=false
-        for dir in "$SERVICES_DIR"/*/; do
+        for dir in "$REPOS_DIR"/*/; do
             if [ -d "$dir" ]; then
                 found=true
                 local repo_name=$(basename "$dir")
@@ -119,12 +109,12 @@ cmd_list() {
 cmd_update() {
     log_info "Updating all repositories..."
     
-    if [ ! -d "$SERVICES_DIR" ]; then
+    if [ ! -d "$REPOS_DIR" ]; then
         log_error "No services found. Run './setup.sh init' first."
         exit 1
     fi
     
-    for dir in "$SERVICES_DIR"/*/; do
+    for dir in "$REPOS_DIR"/*/; do
         if [ -d "$dir/.git" ]; then
             repo_name=$(basename "$dir")
             log_info "Updating $repo_name..."
@@ -140,12 +130,12 @@ cmd_checkout() {
     
     log_info "Checking out '$branch' branch for all services..."
     
-    if [ ! -d "$SERVICES_DIR" ]; then
+    if [ ! -d "$REPOS_DIR" ]; then
         log_error "No services found. Run './setup.sh init' first."
         exit 1
     fi
     
-    for dir in "$SERVICES_DIR"/*/; do
+    for dir in "$REPOS_DIR"/*/; do
         if [ -d "$dir/.git" ]; then
             repo_name=$(basename "$dir")
             log_info "Checking out $repo_name to $branch..."
@@ -159,12 +149,12 @@ cmd_checkout() {
 cmd_cleanup() {
     log_info "Cleaning up merged branches in all services..."
     
-    if [ ! -d "$SERVICES_DIR" ]; then
+    if [ ! -d "$REPOS_DIR" ]; then
         log_error "No services found. Run './setup.sh init' first."
         exit 1
     fi
     
-    for dir in "$SERVICES_DIR"/*/; do
+    for dir in "$REPOS_DIR"/*/; do
         if [ -d "$dir/.git" ]; then
             repo_name=$(basename "$dir")
             log_info "Cleaning $repo_name..."
@@ -189,20 +179,250 @@ cmd_cleanup() {
 }
 
 # -----------------------------------------------------------------------------
+# Full Stack Commands
+# -----------------------------------------------------------------------------
+cmd_start_all() {
+    log_info "Starting complete CoreMS stack..."
+    
+    check_env
+    ensure_docker_network
+    
+    # Build all dependencies and services first
+    log_info "Building all dependencies and services..."
+    build_dependencies
+    build_services
+    
+    # Start infrastructure first
+    log_info "Starting infrastructure services..."
+    docker_start_infra_component "postgres"
+    docker_start_infra_component "rabbitmq" 
+    docker_start_infra_component "s3-minio"
+    
+    # Wait for infrastructure to be ready
+    log_info "Waiting for infrastructure to be ready..."
+    sleep 10
+    
+    # Start all application services
+    log_info "Starting all application services..."
+    docker_start_all_services
+    
+    log_success "Complete CoreMS stack started!"
+}
+
+cmd_stop_all() {
+    log_info "Stopping complete CoreMS stack..."
+    
+    docker_stop "all"
+    
+    log_success "CoreMS stack stopped!"
+}
+
+cmd_restart_all() {
+    log_info "Restarting complete CoreMS stack..."
+    cmd_stop_all
+    sleep 2
+    cmd_start_all
+}
+
+# -----------------------------------------------------------------------------
+# Full Stack Command
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Helper function to get all service directories
+# -----------------------------------------------------------------------------
+get_service_dirs() {
+    if [ ! -d "$REPOS_DIR" ]; then
+        return
+    fi
+    
+    for service_dir in "$REPOS_DIR"/*/; do
+        if [ -d "$service_dir" ]; then
+            local service_name=$(basename "$service_dir")
+            # Skip non-service directories
+            if [[ "$service_name" != "parent" && "$service_name" != "common" && "$service_name" != "frontend" ]]; then
+                echo "$service_dir"
+            fi
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Helper function to find module by pattern
+# -----------------------------------------------------------------------------
+find_module() {
+    local service_dir="$1"
+    local pattern="$2"
+    
+    for module_dir in "$service_dir"*/; do
+        if [ -d "$module_dir" ]; then
+            local module_name=$(basename "$module_dir")
+            if [[ "$module_name" == *"$pattern" ]]; then
+                echo "$module_name"
+                return
+            fi
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Helper function to build modules by type
+# -----------------------------------------------------------------------------
+build_modules_by_type() {
+    local module_type="$1"
+    local step_num="$2"
+    
+    log_info "$step_num. Building $module_type modules..."
+    
+    while IFS= read -r service_dir; do
+        local service_name=$(basename "$service_dir")
+        local module=$(find_module "$service_dir" "$module_type")
+        
+        if [ -n "$module" ]; then
+            log_info "   Building $service_name ($module)..."
+            (cd "$service_dir" && mvn clean install -pl "$module" -DskipTests)
+        else
+            log_warn "   $service_name: No *-$module_type module found, skipping..."
+        fi
+    done < <(get_service_dirs)
+}
+cmd_build() {
+    local target="${1:-all}"
+    
+    log_info "Building dependencies in correct order..."
+    
+    if [ ! -d "$REPOS_DIR" ]; then
+        log_error "No services found. Run './setup.sh init' first."
+        exit 1
+    fi
+    
+    case "$target" in
+        deps|dependencies)
+            build_dependencies
+            ;;
+        all)
+            build_dependencies
+            build_services
+            ;;
+        services)
+            build_services
+            ;;
+        *-ms)
+            # Individual service build
+            build_individual_service "$target"
+            ;;
+        *)
+            log_error "Unknown build target: $target"
+            echo "Usage: ./setup.sh build [deps|services|all|<service-name>]"
+            echo "Examples:"
+            echo "  ./setup.sh build deps"
+            echo "  ./setup.sh build communication-ms"
+            echo "  ./setup.sh build user-ms"
+            exit 1
+            ;;
+    esac
+    
+    log_success "Build complete!"
+}
+
+# -----------------------------------------------------------------------------
+# Build Commands
+# -----------------------------------------------------------------------------
+build_dependencies() {
+    # Step 1: Build parent (needed by everything)
+    if [ -d "$REPOS_DIR/parent" ]; then
+        log_info "1. Building parent..."
+        (cd "$REPOS_DIR/parent" && mvn clean install -DskipTests)
+    else
+        log_warn "parent not found, skipping..."
+    fi
+    
+    # Step 2: Build common (depends on parent, needed by all services)
+    if [ -d "$REPOS_DIR/common" ]; then
+        log_info "2. Building common..."
+        (cd "$REPOS_DIR/common" && mvn clean install -DskipTests)
+    else
+        log_warn "common not found, skipping..."
+    fi
+    
+    # Step 3: Build all *-api modules (needed by clients)
+    build_modules_by_type "api" "3"
+    
+    # Step 4: Build all *-client modules (needed by services)
+    build_modules_by_type "client" "4"
+}
+
+build_services() {
+    # Step 5: Build all *-service modules
+    build_modules_by_type "service" "5"
+}
+
+# -----------------------------------------------------------------------------
+# Individual Service Build
+# -----------------------------------------------------------------------------
+build_individual_service() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        log_info "Available services:"
+        for dir in "$REPOS_DIR"/*/; do
+            if [ -d "$dir" ]; then
+                local name=$(basename "$dir")
+                if [[ "$name" != "parent" && "$name" != "common" ]]; then
+                    echo "  - $name"
+                fi
+            fi
+        done
+        exit 1
+    fi
+    
+    log_info "Building individual service: $service_name"
+    
+    # Handle frontend differently (Node.js project)
+    if [[ "$service_name" == "frontend" ]]; then
+        log_info "  Building frontend (Node.js project)..."
+        (cd "$service_dir" && npm ci && npm run build)
+    else
+        # Build the entire service (all modules) with clean install
+        log_info "  Building all modules for $service_name..."
+        (cd "$service_dir" && mvn clean install -DskipTests)
+    fi
+    
+    log_success "Built $service_name successfully!"
+}
+
+# -----------------------------------------------------------------------------
 # Migration Commands
 # -----------------------------------------------------------------------------
 cmd_migrate() {
     log_info "Running database migrations..."
     
+    check_env
+    
+    # Load environment variables from .env
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+    
     local args=""
+    local service_filter=""
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             --mockdata) args="$args --migrations.include-mockdata=true"; shift ;;
             --clean) args="$args --migrations.clean-before-migrate=true"; shift ;;
+            --service) service_filter="$2"; shift 2 ;;
+            *-ms) service_filter="$1"; shift ;;
             *) shift ;;
         esac
     done
+    
+    if [ -n "$service_filter" ]; then
+        args="$args --migrations.service-filter=$service_filter"
+        log_info "Running migrations for service: $service_filter"
+    fi
     
     cd "$SCRIPT_DIR/migrations/runner"
     mvn spring-boot:run -Dspring-boot.run.arguments="$args"
@@ -260,11 +480,11 @@ docker_start() {
     local component="$1"
     
     if [ -z "$component" ]; then
-        log_error "Please specify a component (infra, services, all, postgres, rabbitmq, minio)"
+        log_error "Please specify a component (infra, services, all, postgres, rabbitmq, minio, or service name like communication-ms)"
         return 1
     fi
     
-    check_docker_env
+    check_env
     ensure_docker_network
     
     case "$component" in
@@ -288,8 +508,14 @@ docker_start() {
         minio)
             docker_start_infra_component "s3-minio"
             ;;
+        *-ms|frontend)
+            docker_start_individual_service "$component"
+            ;;
         *)
             log_error "Unknown component: $component"
+            echo "Available components:"
+            echo "  infra, services, all, postgres, rabbitmq, minio"
+            echo "  Individual services: communication-ms, user-ms, document-ms, translation-ms, frontend"
             return 1
             ;;
     esac
@@ -299,11 +525,11 @@ docker_start() {
 
 docker_start_infra_component() {
     local component="$1"
-    local file="$DOCKER_DIR/infrastructure/${component}-compose.yaml"
+    local file="$DOCKER_DIR/infra/${component}-compose.yaml"
     
     if [ -f "$file" ]; then
         log_info "Starting $component..."
-        docker-compose --env-file "$DOCKER_DIR/.env" -f "$file" up -d
+        docker-compose --env-file "$SCRIPT_DIR/.env" -f "$file" up -d
     else
         log_error "Compose file not found: $file"
         return 1
@@ -311,36 +537,70 @@ docker_start_infra_component() {
 }
 
 docker_start_all_services() {
-    log_info "Starting all services from services/*/docker/..."
+    log_info "Starting all services from repos/*/docker/..."
     
-    if [ ! -d "$SERVICES_DIR" ]; then
-        log_warn "No services directory found. Run './setup.sh init' first."
+    if [ ! -d "$REPOS_DIR" ]; then
+        log_warn "No repos directory found. Run './setup.sh init' first."
         return
     fi
     
+    # First, ensure all services are built
+    log_info "Ensuring all services are built..."
+    build_services
+    
     local found=false
-    for service_dir in "$SERVICES_DIR"/*/; do
-        if [ -d "$service_dir" ]; then
-            local service_name=$(basename "$service_dir")
-            local compose_file="$service_dir/docker/docker-compose.yaml"
-            local compose_file_alt="$service_dir/docker/docker-compose.yml"
-            
-            if [ -f "$compose_file" ]; then
-                found=true
-                log_info "Starting $service_name..."
-                docker-compose --env-file "$DOCKER_DIR/.env" -f "$compose_file" up -d
-            elif [ -f "$compose_file_alt" ]; then
-                found=true
-                log_info "Starting $service_name..."
-                docker-compose --env-file "$DOCKER_DIR/.env" -f "$compose_file_alt" up -d
-            else
-                log_warn "$service_name: No docker-compose.yaml found in docker/"
-            fi
-        fi
-    done
+    while IFS= read -r service_dir; do
+        local service_name=$(basename "$service_dir")
+        docker_start_individual_service "$service_name"
+        found=true
+    done < <(get_service_dirs)
+    
+    # Also check frontend
+    if [ -d "$REPOS_DIR/frontend/docker" ]; then
+        docker_start_individual_service "frontend"
+        found=true
+    fi
     
     if [ "$found" = false ]; then
         log_warn "No services with docker-compose files found"
+    fi
+}
+
+docker_start_individual_service() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    local compose_file="$service_dir/docker/docker-compose.yaml"
+    local compose_file_alt="$service_dir/docker/docker-compose.yml"
+    local env_file="$service_dir/.env"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        return 1
+    fi
+    
+    # Build the service first
+    log_info "Building $service_name before starting..."
+    build_individual_service "$service_name"
+    
+    if [ -f "$compose_file" ]; then
+        log_info "Starting $service_name..."
+        if [ -f "$env_file" ]; then
+            docker-compose --env-file "$env_file" -f "$compose_file" up -d --build
+        else
+            log_warn "$service_name: No .env file found, using defaults..."
+            docker-compose -f "$compose_file" up -d --build
+        fi
+    elif [ -f "$compose_file_alt" ]; then
+        log_info "Starting $service_name..."
+        if [ -f "$env_file" ]; then
+            docker-compose --env-file "$env_file" -f "$compose_file_alt" up -d --build
+        else
+            log_warn "$service_name: No .env file found, using defaults..."
+            docker-compose -f "$compose_file_alt" up -d --build
+        fi
+    else
+        log_error "$service_name: No docker-compose.yaml found in docker/ directory"
+        return 1
     fi
 }
 
@@ -373,8 +633,14 @@ docker_stop() {
         minio)
             docker_stop_infra_component "s3-minio"
             ;;
+        *-ms|frontend)
+            docker_stop_individual_service "$component"
+            ;;
         *)
             log_error "Unknown component: $component"
+            echo "Available components:"
+            echo "  infra, services, all, postgres, rabbitmq, minio"
+            echo "  Individual services: communication-ms, user-ms, document-ms, translation-ms, frontend"
             return 1
             ;;
     esac
@@ -384,7 +650,7 @@ docker_stop() {
 
 docker_stop_infra_component() {
     local component="$1"
-    local file="$DOCKER_DIR/infrastructure/${component}-compose.yaml"
+    local file="$DOCKER_DIR/infra/${component}-compose.yaml"
     
     if [ -f "$file" ]; then
         log_info "Stopping $component..."
@@ -395,25 +661,38 @@ docker_stop_infra_component() {
 docker_stop_all_services() {
     log_info "Stopping all services..."
     
-    if [ ! -d "$SERVICES_DIR" ]; then
+    if [ ! -d "$REPOS_DIR" ]; then
         return
     fi
     
-    for service_dir in "$SERVICES_DIR"/*/; do
+    for service_dir in "$REPOS_DIR"/*/; do
         if [ -d "$service_dir" ]; then
             local service_name=$(basename "$service_dir")
-            local compose_file="$service_dir/docker/docker-compose.yaml"
-            local compose_file_alt="$service_dir/docker/docker-compose.yml"
-            
-            if [ -f "$compose_file" ]; then
-                log_info "Stopping $service_name..."
-                docker-compose -f "$compose_file" down
-            elif [ -f "$compose_file_alt" ]; then
-                log_info "Stopping $service_name..."
-                docker-compose -f "$compose_file_alt" down
-            fi
+            docker_stop_individual_service "$service_name"
         fi
     done
+}
+
+docker_stop_individual_service() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    local compose_file="$service_dir/docker/docker-compose.yaml"
+    local compose_file_alt="$service_dir/docker/docker-compose.yml"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        return 1
+    fi
+    
+    if [ -f "$compose_file" ]; then
+        log_info "Stopping $service_name..."
+        docker-compose -f "$compose_file" down
+    elif [ -f "$compose_file_alt" ]; then
+        log_info "Stopping $service_name..."
+        docker-compose -f "$compose_file_alt" down
+    else
+        log_warn "$service_name: No docker-compose.yaml found, skipping..."
+    fi
 }
 
 docker_rebuild() {
@@ -424,24 +703,24 @@ docker_rebuild() {
         return 1
     fi
     
-    check_docker_env
+    check_env
     ensure_docker_network
     
     log_info "Rebuilding $component..."
     
     case "$component" in
         postgres|rabbitmq|s3-minio)
-            local file="$DOCKER_DIR/infrastructure/${component}-compose.yaml"
+            local file="$DOCKER_DIR/infra/${component}-compose.yaml"
             if [ -f "$file" ]; then
                 docker-compose -f "$file" down 2>/dev/null || true
-                docker-compose --env-file "$DOCKER_DIR/.env" -f "$file" up -d --build
+                docker-compose --env-file "$SCRIPT_DIR/.env" -f "$file" up -d --build
             fi
             ;;
         minio)
             docker_rebuild "s3-minio"
             ;;
         services)
-            for service_dir in "$SERVICES_DIR"/*/; do
+            for service_dir in "$REPOS_DIR"/*/; do
                 if [ -d "$service_dir" ]; then
                     local service_name=$(basename "$service_dir")
                     local compose_file="$service_dir/docker/docker-compose.yaml"
@@ -450,11 +729,11 @@ docker_rebuild() {
                     if [ -f "$compose_file" ]; then
                         log_info "Rebuilding $service_name..."
                         docker-compose -f "$compose_file" down 2>/dev/null || true
-                        docker-compose --env-file "$DOCKER_DIR/.env" -f "$compose_file" up -d --build
+                        docker-compose --env-file "$SCRIPT_DIR/.env" -f "$compose_file" up -d --build
                     elif [ -f "$compose_file_alt" ]; then
                         log_info "Rebuilding $service_name..."
                         docker-compose -f "$compose_file_alt" down 2>/dev/null || true
-                        docker-compose --env-file "$DOCKER_DIR/.env" -f "$compose_file_alt" up -d --build
+                        docker-compose --env-file "$SCRIPT_DIR/.env" -f "$compose_file_alt" up -d --build
                     fi
                 fi
             done
@@ -478,7 +757,7 @@ docker_logs() {
     
     case "$component" in
         postgres|rabbitmq|s3-minio)
-            local file="$DOCKER_DIR/infrastructure/${component}-compose.yaml"
+            local file="$DOCKER_DIR/infra/${component}-compose.yaml"
             if [ -f "$file" ]; then
                 docker-compose -f "$file" logs -f
             fi
@@ -486,21 +765,40 @@ docker_logs() {
         minio)
             docker_logs "s3-minio"
             ;;
+        *-ms|frontend)
+            docker_logs_individual_service "$component"
+            ;;
         *)
-            # Try to find in services
-            local compose_file="$SERVICES_DIR/$component/docker/docker-compose.yaml"
-            local compose_file_alt="$SERVICES_DIR/$component/docker/docker-compose.yml"
-            
-            if [ -f "$compose_file" ]; then
-                docker-compose -f "$compose_file" logs -f
-            elif [ -f "$compose_file_alt" ]; then
-                docker-compose -f "$compose_file_alt" logs -f
-            else
-                log_error "Unknown component or no docker-compose found: $component"
-                return 1
-            fi
+            log_error "Unknown component: $component"
+            echo "Available components:"
+            echo "  postgres, rabbitmq, minio"
+            echo "  Individual services: communication-ms, user-ms, document-ms, translation-ms, frontend"
+            return 1
             ;;
     esac
+}
+
+docker_logs_individual_service() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    local compose_file="$service_dir/docker/docker-compose.yaml"
+    local compose_file_alt="$service_dir/docker/docker-compose.yml"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        return 1
+    fi
+    
+    if [ -f "$compose_file" ]; then
+        log_info "Showing logs for $service_name..."
+        docker-compose -f "$compose_file" logs -f
+    elif [ -f "$compose_file_alt" ]; then
+        log_info "Showing logs for $service_name..."
+        docker-compose -f "$compose_file_alt" logs -f
+    else
+        log_error "$service_name: No docker-compose.yaml found"
+        return 1
+    fi
 }
 
 docker_status() {
@@ -536,24 +834,40 @@ cmd_help() {
     echo "  checkout [branch]         Checkout branch for all repos (default: main)"
     echo "  cleanup                   Delete local branches merged into main"
     echo ""
+    echo "Build Commands:"
+    echo "  build [deps|services|all|<service>] Build dependencies and/or services"
+    echo ""
     echo "Migration Commands:"
-    echo "  migrate [--mockdata] [--clean]   Run database migrations"
+    echo "  migrate [--mockdata] [--clean] [<service>]   Run database migrations"
+    echo ""
+    echo "  start-all             Start complete CoreMS stack (infra + services)"
+    echo "  stop-all              Stop complete CoreMS stack"
+    echo "  restart-all           Restart complete CoreMS stack"
+    echo ""
+    echo "  start-all             Start complete stack (infra + all services)"
     echo ""
     echo "Docker Commands:"
-    echo "  docker start <component>  Start infra/services/all/postgres/rabbitmq/minio"
-    echo "  docker stop <component>   Stop component(s)"
-    echo "  docker restart <component> Restart component(s)"
+    echo "  docker start <component>  Start infra/services/all/postgres/rabbitmq/minio/<service>"
+    echo "  docker stop <component>   Stop component(s) or individual service"
+    echo "  docker restart <component> Restart component(s) or individual service"
     echo "  docker rebuild <component> Rebuild and restart"
-    echo "  docker logs <component>   View logs"
+    echo "  docker logs <component>   View logs for component or individual service"
     echo "  docker status             Show running containers"
     echo "  docker clean              Stop all and remove volumes"
     echo ""
     echo "Examples:"
     echo "  ./setup.sh init"
     echo "  ./setup.sh add user-ms document-ms"
+    echo "  ./setup.sh start-all"
+    echo "  ./setup.sh stop-all"
+    echo "  ./setup.sh build all"
+    echo "  ./setup.sh build communication-ms"
     echo "  ./setup.sh docker start infra"
-    echo "  ./setup.sh docker start services"
+    echo "  ./setup.sh docker start communication-ms"
+    echo "  ./setup.sh docker logs user-ms"
+    echo "  ./setup.sh docker stop document-ms"
     echo "  ./setup.sh migrate --mockdata"
+    echo "  ./setup.sh migrate communication-ms --mockdata"
     echo "  ./setup.sh checkout main"
     echo ""
 }
@@ -563,7 +877,7 @@ cmd_help() {
 # -----------------------------------------------------------------------------
 clone_repo() {
     local repo_name=$1
-    local repo_path="$SERVICES_DIR/$repo_name"
+    local repo_path="$REPOS_DIR/$repo_name"
     
     if [ -d "$repo_path" ]; then
         log_warn "$repo_name already exists, skipping..."
@@ -586,7 +900,12 @@ main() {
         update)     cmd_update ;;
         checkout)   shift; cmd_checkout "$@" ;;
         cleanup)    cmd_cleanup ;;
+        start-all)  cmd_start_all ;;
+        stop-all)   cmd_stop_all ;;
+        restart-all) cmd_restart_all ;;
+        build)      shift; cmd_build "$@" ;;
         migrate)    shift; cmd_migrate "$@" ;;
+        start-all)  cmd_start_all ;;
         docker)     shift; cmd_docker "$@" ;;
         help|--help|-h) cmd_help ;;
         *)          log_error "Unknown command: $1"; cmd_help; exit 1 ;;
