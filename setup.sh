@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_DIR="$SCRIPT_DIR/repos"
 DOCKER_DIR="$SCRIPT_DIR/docker"
-GITHUB_ORG="core-microservices"
+GITHUB_ORG="CoreWebMicroservices"
 GITHUB_BASE="https://github.com/$GITHUB_ORG"
 
 # -----------------------------------------------------------------------------
@@ -50,6 +50,113 @@ check_env() {
 }
 
 # -----------------------------------------------------------------------------
+# Environment Commands
+# -----------------------------------------------------------------------------
+cmd_create_env() {
+    local target="${1:-all}"
+    
+    log_info "Creating environment files..."
+    
+    case "$target" in
+        all)
+            create_main_env
+            create_service_envs
+            ;;
+        main)
+            create_main_env
+            ;;
+        services)
+            create_service_envs
+            ;;
+        *-ms)
+            create_individual_service_env "$target"
+            ;;
+        *)
+            log_error "Unknown env target: $target"
+            echo "Usage: ./setup.sh create-env [all|main|services|<service-name>]"
+            echo "Examples:"
+            echo "  ./setup.sh create-env all"
+            echo "  ./setup.sh create-env services"
+            echo "  ./setup.sh create-env user-ms"
+            exit 1
+            ;;
+    esac
+    
+    log_success "Environment files created!"
+}
+
+create_main_env() {
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        log_warn "Main .env already exists, skipping..."
+        return
+    fi
+    
+    log_info "Creating main .env file..."
+    cp "$SCRIPT_DIR/.env-example" "$SCRIPT_DIR/.env"
+    log_success "Created main .env file"
+}
+
+create_service_envs() {
+    log_info "Creating service environment files..."
+    
+    if [ ! -d "$REPOS_DIR" ]; then
+        log_error "No services found. Run './setup.sh init' first."
+        return 1
+    fi
+    
+    for service_dir in "$REPOS_DIR"/*/; do
+        if [ -d "$service_dir" ]; then
+            local service_name=$(basename "$service_dir")
+            
+            # Skip non-service directories
+            if [[ "$service_name" == "parent" || "$service_name" == "common" ]]; then
+                continue
+            fi
+            
+            create_individual_service_env "$service_name"
+        fi
+    done
+}
+
+create_individual_service_env() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    local env_file="$service_dir/.env"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        return 1
+    fi
+    
+    if [ -f "$env_file" ]; then
+        log_warn "$service_name: .env already exists, skipping..."
+        return
+    fi
+    
+    log_info "Creating .env for $service_name..."
+    
+    # Handle frontend differently - copy from .env.local
+    if [[ "$service_name" == "frontend" ]]; then
+        local env_local_file="$service_dir/.env.local"
+        if [ -f "$env_local_file" ]; then
+            cp "$env_local_file" "$env_file"
+            log_success "Created .env for $service_name (from .env.local)"
+        else
+            log_warn "$service_name: .env.local not found, skipping..."
+        fi
+    else
+        # For other services, copy from their own .env-example
+        local service_env_example="$service_dir/.env-example"
+        if [ -f "$service_env_example" ]; then
+            cp "$service_env_example" "$env_file"
+            log_success "Created .env for $service_name (from service .env-example)"
+        else
+            log_warn "$service_name: .env-example not found, skipping..."
+        fi
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # Repository Commands
 # -----------------------------------------------------------------------------
 cmd_init() {
@@ -66,7 +173,77 @@ cmd_init() {
     echo ""
     echo "Next steps:"
     echo "  ./setup.sh add user-ms document-ms    # Add services"
+    echo "  ./setup.sh init-base                  # Add base services + frontend"
     echo "  ./setup.sh list                       # Show available services"
+}
+
+cmd_init_base() {
+    log_info "Initializing Core Microservices with base services..."
+    
+    mkdir -p "$REPOS_DIR"
+    
+    # Clone required repos and base services
+    log_info "Cloning required repositories and base services..."
+    clone_repo "parent"
+    clone_repo "common"
+    clone_repo "user-ms"
+    clone_repo "document-ms"
+    clone_repo "communication-ms"
+    clone_repo "translation-ms"
+    clone_repo "frontend"
+    
+    log_success "Base initialization complete!"
+    echo ""
+    echo "Base services installed:"
+    echo "  ✓ parent (Maven parent POM)"
+    echo "  ✓ common (Shared libraries)"
+    echo "  ✓ user-ms (User management service)"
+    echo "  ✓ document-ms (File storage & management)"
+    echo "  ✓ communication-ms (Email/SMS/notifications)"
+    echo "  ✓ translation-ms (Internationalization)"
+    echo "  ✓ frontend (React frontend application)"
+    echo ""
+    echo "Next steps:"
+    echo "  ./setup.sh build all                  # Build all services"
+    echo "  ./setup.sh start-all                  # Start complete stack"
+}
+
+cmd_init_all() {
+    log_info "Checking and fetching all available repositories..."
+    
+    mkdir -p "$REPOS_DIR"
+    
+    # List of all known repositories in the CoreWebMicroservices organization
+    local all_repos=(
+        "parent"
+        "common"
+        "user-ms"
+        "document-ms"
+        "communication-ms"
+        "translation-ms"
+        "frontend"
+    )
+    
+    log_info "Fetching all repositories from $GITHUB_ORG organization..."
+    
+    for repo in "${all_repos[@]}"; do
+        clone_repo "$repo"
+    done
+    
+    log_success "All repositories initialized!"
+    echo ""
+    echo "All available services installed:"
+    echo "  ✓ parent (Maven parent POM)"
+    echo "  ✓ common (Shared libraries)"
+    echo "  ✓ user-ms (User management service)"
+    echo "  ✓ document-ms (File storage & management)"
+    echo "  ✓ communication-ms (Email/SMS/notifications)"
+    echo "  ✓ translation-ms (Internationalization)"
+    echo "  ✓ frontend (React frontend application)"
+    echo ""
+    echo "Next steps:"
+    echo "  ./setup.sh build all                  # Build all services"
+    echo "  ./setup.sh start-all                  # Start complete stack"
 }
 
 cmd_add() {
@@ -437,9 +614,10 @@ cmd_docker() {
     
     case "$action" in
         start)   docker_start "$component" ;;
+        up)      docker_start "$component" ;;
         stop)    docker_stop "$component" ;;
         restart) docker_stop "$component"; sleep 2; docker_start "$component" ;;
-        rebuild) docker_rebuild "$component" ;;
+        rebuild) docker_rebuild_with_build "$component" ;;
         logs)    docker_logs "$component" ;;
         status)  docker_status ;;
         clean)   docker_clean ;;
@@ -453,10 +631,11 @@ docker_help() {
     echo "Usage: ./setup.sh docker <action> [component]"
     echo ""
     echo "Actions:"
-    echo "  start <component>   Start component(s)"
+    echo "  start <component>   Start component(s) (quick - no rebuild)"
+    echo "  up <component>      Alias for start"
     echo "  stop <component>    Stop component(s)"
     echo "  restart <component> Restart component(s)"
-    echo "  rebuild <component> Rebuild and restart"
+    echo "  rebuild <component> Maven build + Docker rebuild + start (slow)"
     echo "  logs <component>    View logs"
     echo "  status              Show status of all containers"
     echo "  clean               Stop all and remove volumes"
@@ -470,8 +649,8 @@ docker_help() {
     echo "  minio      MinIO S3 storage"
     echo ""
     echo "Examples:"
-    echo "  ./setup.sh docker start infra"
-    echo "  ./setup.sh docker start services"
+    echo "  ./setup.sh docker start all      # Quick start (daily development)"
+    echo "  ./setup.sh docker rebuild all    # Full rebuild (when needed)"
     echo "  ./setup.sh docker logs postgres"
     echo "  ./setup.sh docker status"
 }
@@ -494,13 +673,13 @@ docker_start() {
             docker_start_infra_component "s3-minio"
             ;;
         services)
-            docker_start_all_services
+            docker_start_all_services_quick
             ;;
         all)
             docker_start_infra_component "postgres"
             docker_start_infra_component "rabbitmq"
             docker_start_infra_component "s3-minio"
-            docker_start_all_services
+            docker_start_all_services_quick
             ;;
         postgres|rabbitmq|s3-minio)
             docker_start_infra_component "$component"
@@ -509,7 +688,7 @@ docker_start() {
             docker_start_infra_component "s3-minio"
             ;;
         *-ms|frontend)
-            docker_start_individual_service "$component"
+            docker_start_individual_service_quick "$component"
             ;;
         *)
             log_error "Unknown component: $component"
@@ -566,6 +745,32 @@ docker_start_all_services() {
     fi
 }
 
+docker_start_all_services_quick() {
+    log_info "Starting all services (quick - no rebuild)..."
+    
+    if [ ! -d "$REPOS_DIR" ]; then
+        log_warn "No repos directory found. Run './setup.sh init' first."
+        return
+    fi
+    
+    local found=false
+    while IFS= read -r service_dir; do
+        local service_name=$(basename "$service_dir")
+        docker_start_individual_service_quick "$service_name"
+        found=true
+    done < <(get_service_dirs)
+    
+    # Also check frontend
+    if [ -d "$REPOS_DIR/frontend/docker" ]; then
+        docker_start_individual_service_quick "frontend"
+        found=true
+    fi
+    
+    if [ "$found" = false ]; then
+        log_warn "No services with docker-compose files found"
+    fi
+}
+
 docker_start_individual_service() {
     local service_name="$1"
     local service_dir="$REPOS_DIR/$service_name"
@@ -597,6 +802,40 @@ docker_start_individual_service() {
         else
             log_warn "$service_name: No .env file found, using defaults..."
             docker-compose -f "$compose_file_alt" up -d --build
+        fi
+    else
+        log_error "$service_name: No docker-compose.yaml found in docker/ directory"
+        return 1
+    fi
+}
+
+docker_start_individual_service_quick() {
+    local service_name="$1"
+    local service_dir="$REPOS_DIR/$service_name"
+    local compose_file="$service_dir/docker/docker-compose.yaml"
+    local compose_file_alt="$service_dir/docker/docker-compose.yml"
+    local env_file="$service_dir/.env"
+    
+    if [ ! -d "$service_dir" ]; then
+        log_error "Service not found: $service_name"
+        return 1
+    fi
+    
+    if [ -f "$compose_file" ]; then
+        log_info "Starting $service_name (quick)..."
+        if [ -f "$env_file" ]; then
+            docker-compose --env-file "$env_file" -f "$compose_file" up -d
+        else
+            log_warn "$service_name: No .env file found, using defaults..."
+            docker-compose -f "$compose_file" up -d
+        fi
+    elif [ -f "$compose_file_alt" ]; then
+        log_info "Starting $service_name (quick)..."
+        if [ -f "$env_file" ]; then
+            docker-compose --env-file "$env_file" -f "$compose_file_alt" up -d
+        else
+            log_warn "$service_name: No .env file found, using defaults..."
+            docker-compose -f "$compose_file_alt" up -d
         fi
     else
         log_error "$service_name: No docker-compose.yaml found in docker/ directory"
@@ -747,6 +986,53 @@ docker_rebuild() {
     log_success "Rebuilt $component!"
 }
 
+docker_rebuild_with_build() {
+    local component="$1"
+    
+    if [ -z "$component" ]; then
+        log_error "Please specify a component to rebuild"
+        return 1
+    fi
+    
+    check_env
+    ensure_docker_network
+    
+    log_info "Rebuilding $component (with Maven build)..."
+    
+    case "$component" in
+        postgres|rabbitmq|s3-minio)
+            docker_rebuild "$component"
+            ;;
+        minio)
+            docker_rebuild "s3-minio"
+            ;;
+        services)
+            # Build all services first
+            build_services
+            for service_dir in "$REPOS_DIR"/*/; do
+                if [ -d "$service_dir" ]; then
+                    local service_name=$(basename "$service_dir")
+                    docker_stop_individual_service "$service_name"
+                    docker_start_individual_service "$service_name"
+                fi
+            done
+            ;;
+        all)
+            docker_rebuild_with_build "services"
+            ;;
+        *-ms|frontend)
+            docker_stop_individual_service "$component"
+            docker_start_individual_service "$component"
+            ;;
+        *)
+            log_error "Unknown component: $component"
+            return 1
+            ;;
+    esac
+    
+    log_success "Rebuilt $component!"
+}
+
 docker_logs() {
     local component="$1"
     
@@ -828,47 +1114,37 @@ cmd_help() {
     echo ""
     echo "Repository Commands:"
     echo "  init                      Initialize project (clone parent + common)"
+    echo "  init-base                 Initialize with base services (parent + common + core services + frontend)"
+    echo "  init-all                  Initialize with all available repositories"
     echo "  add <services...>         Add services (e.g., add user-ms document-ms)"
     echo "  list                      List available and installed services"
     echo "  update                    Pull latest for all cloned repos"
     echo "  checkout [branch]         Checkout branch for all repos (default: main)"
     echo "  cleanup                   Delete local branches merged into main"
     echo ""
-    echo "Build Commands:"
-    echo "  build [deps|services|all|<service>] Build dependencies and/or services"
+    echo "Environment Commands:"
+    echo "  create-env [all|main|services|<service>] Create .env files"
     echo ""
     echo "Migration Commands:"
     echo "  migrate [--mockdata] [--clean] [<service>]   Run database migrations"
     echo ""
+    echo "Build Commands:"
+    echo "  build [deps|services|all|<service>] Build dependencies and/or services"
+    echo ""
+    echo "Start Commands:"
     echo "  start-all             Start complete CoreMS stack (infra + services)"
     echo "  stop-all              Stop complete CoreMS stack"
     echo "  restart-all           Restart complete CoreMS stack"
     echo ""
-    echo "  start-all             Start complete stack (infra + all services)"
-    echo ""
     echo "Docker Commands:"
-    echo "  docker start <component>  Start infra/services/all/postgres/rabbitmq/minio/<service>"
+    echo "  docker start <component>  Start component(s) (quick - no rebuild)"
+    echo "  docker up <component>     Alias for start"
     echo "  docker stop <component>   Stop component(s) or individual service"
     echo "  docker restart <component> Restart component(s) or individual service"
-    echo "  docker rebuild <component> Rebuild and restart"
+    echo "  docker rebuild <component> Maven build + Docker rebuild + start (slow)"
     echo "  docker logs <component>   View logs for component or individual service"
     echo "  docker status             Show running containers"
     echo "  docker clean              Stop all and remove volumes"
-    echo ""
-    echo "Examples:"
-    echo "  ./setup.sh init"
-    echo "  ./setup.sh add user-ms document-ms"
-    echo "  ./setup.sh start-all"
-    echo "  ./setup.sh stop-all"
-    echo "  ./setup.sh build all"
-    echo "  ./setup.sh build communication-ms"
-    echo "  ./setup.sh docker start infra"
-    echo "  ./setup.sh docker start communication-ms"
-    echo "  ./setup.sh docker logs user-ms"
-    echo "  ./setup.sh docker stop document-ms"
-    echo "  ./setup.sh migrate --mockdata"
-    echo "  ./setup.sh migrate communication-ms --mockdata"
-    echo "  ./setup.sh checkout main"
     echo ""
 }
 
@@ -895,17 +1171,19 @@ clone_repo() {
 main() {
     case "${1:-help}" in
         init)       shift; cmd_init "$@" ;;
+        init-base)  cmd_init_base ;;
+        init-all)   cmd_init_all ;;
         add)        shift; cmd_add "$@" ;;
         list)       cmd_list ;;
         update)     cmd_update ;;
         checkout)   shift; cmd_checkout "$@" ;;
         cleanup)    cmd_cleanup ;;
+        create-env) shift; cmd_create_env "$@" ;;
         start-all)  cmd_start_all ;;
         stop-all)   cmd_stop_all ;;
         restart-all) cmd_restart_all ;;
         build)      shift; cmd_build "$@" ;;
         migrate)    shift; cmd_migrate "$@" ;;
-        start-all)  cmd_start_all ;;
         docker)     shift; cmd_docker "$@" ;;
         help|--help|-h) cmd_help ;;
         *)          log_error "Unknown command: $1"; cmd_help; exit 1 ;;
