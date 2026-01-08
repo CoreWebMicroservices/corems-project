@@ -84,15 +84,36 @@ Also will try to publish YouTube walking through videos.
 git clone https://github.com/CoreWebMicroservices/corems-project.git
 cd corems-project
 
+# Run to check all availible commands
+./setup.sh
+
+# Init all services with 
+./setup.sh init-all
+
+# Or init base service pack with 
+./setup.sh init-base
+
+# Or init only parent and common and pull services as you want with `add` command
+./setup.sh init 
+
+# Create .env files, dont forget correct them as you go!
+./setup.sh create-env
+
+# After .env files is setup you can 
 # Start infrastructure (PostgreSQL, RabbitMQ, MinIO)
 ./setup.sh infra
 
-# Build and start all services
+# Now you can build all the services you have
+./setup.sh build all
+
+# Now run migration! flag: --mockdata will include mock data to your db
+./setup.sh migrate --mockdata
+
+# Build and start all will start all service in docker, can crush if you missed some env vars in the services, each service has its own env file
 ./setup.sh start-all
 
-# Or start individual services
-./setup.sh build user-ms
-./setup.sh start user-ms
+# Or use docker command
+./setup.sh docker start user-ms
 ```
 
 ### Available Commands
