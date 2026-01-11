@@ -54,6 +54,16 @@ core-microservices/
 
 ## Best Practices
 
+### Development vs Production
+- **Pre-v1.0 Development**: V1.0.0 migrations can be modified directly for schema changes
+- **Post-v1.0 Release**: All schema changes must use new versioned migrations (V1.0.1, V1.0.2, etc.)
+- **Checksum Changes**: Flyway tracks checksums - modifying existing migrations in production will cause failures
+
+### Primary Keys
+- **New tables**: Use `BIGSERIAL` for primary keys (maps to `Long` in JPA)
+- **Legacy tables**: Keep existing `SERIAL` for backward compatibility
+- **Rationale**: `BIGINT` prevents overflow issues and is modern best practice
+
 ### Schema Creation
 ```sql
 CREATE SCHEMA IF NOT EXISTS schema_name;
