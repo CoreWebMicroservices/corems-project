@@ -56,15 +56,11 @@ Contact me if you want to contribute or have any suggestions.
 
 ## Who is this for?
 
-- Startup founders
-- Small companies launching SaaS products
-- Developers building side projects
-- Engineering teams looking for a fast production-ready foundation
-- Students learning enterprise architecture
+If you're building an application that needs user authentication, file storage, notifications, or multi-language support—this gives you a head start. Instead of spending months on infrastructure, you can focus on your unique business logic.
 
-If you want to start fast, scale safely, and keep your architecture clean, Core Microservices gives you the jump-start you need.
+Whether you're exploring microservices architecture, prototyping a new product, or looking for reference implementations of common patterns—Core Microservices provides working code you can learn from and build upon.
 
-And it is free to use.
+Free and open source under Apache 2.0.
 
 ## Documentation & Guides (Coming soon...)
 
