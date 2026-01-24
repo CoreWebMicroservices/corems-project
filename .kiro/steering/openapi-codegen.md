@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "**/*-api/**"
+fileMatchPattern: "**/*-api/**,**/*-client/**"
 ---
 
 # OpenAPI & Code Generation

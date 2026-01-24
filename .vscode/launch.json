@@ -38,6 +38,15 @@
             "envFile": "${workspaceFolder}/repos/translation-ms/.env"
         },
         {
+            "type": "java",
+            "name": "Tempalate Service",
+            "request": "launch",
+            "mainClass": "com.corems.templatems.app.TemplateServiceApplication",
+            "projectName": "template-service",
+            "cwd": "${workspaceFolder}/repos/template-ms",
+            "envFile": "${workspaceFolder}/repos/template-ms/.env"
+        },
+        {
             "type": "node-terminal",
             "name": "Frontend Dev Server",
             "request": "launch",

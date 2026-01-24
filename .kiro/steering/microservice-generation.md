@@ -108,8 +108,6 @@ spring:
 ```yaml
 spring:
   security:
-    common:
-      enabled: false
     cors:
       allowedOrigins: http://localhost:8080
     jwt:
@@ -124,10 +122,11 @@ spring:
 ```
 
 **Key Points**:
-- `common.enabled: false` - use autoconfiguration from common module
 - CORS configured for local frontend
 - JWT supports both symmetric (secretKey) and asymmetric (privateKey/publicKey)
 - Standard token expiration times (10 min access, 24 hour refresh)
+- Security is enabled by default via autoconfiguration
+- To disable security for development: add `corems.security.enabled: false` to application.yaml
 
 ### .env-example
 **Location**: `<service>-ms/.env-example`
@@ -140,23 +139,23 @@ DATABASE_URL=jdbc:postgresql://localhost:5432/service_ms
 DATABASE_USER=postgres
 DATABASE_PASSWORD=postgres
 
-# JWT RSA Keys (generate with: openssl genrsa -out private.pem 2048 && openssl rsa -in private.pem -pubout -out public.pem)
-# Then copy the full PEM content including -----BEGIN/END----- lines
-JWT_PRIVATE_KEY=
-JWT_PUBLIC_KEY=
+# JWT symmetric key (for local development)
+AUTH_TOKEN_SECRET=your-secret-key-here-min-256-bits
 
 # service port
 SERVICE-NAME-PORT=300X
 
 ## optional
 
-# JWT symmetric key (alternative to RSA keys)
-# AUTH_TOKEN_SECRET=
+# JWT RSA Keys (for production - generate with: openssl genrsa -out private.pem 2048 && openssl rsa -in private.pem -pubout -out public.pem)
+# JWT_PRIVATE_KEY=
+# JWT_PUBLIC_KEY=
 ```
 
 **Key Points**:
 - Separate mandatory and optional sections
-- Include instructions for generating RSA keys
+- Use simple symmetric key (AUTH_TOKEN_SECRET) for local development
+- RSA keys are optional for production use
 - Service port matches application.yaml default
 - Database URL includes schema name
 - Never commit actual .env file (only .env-example)

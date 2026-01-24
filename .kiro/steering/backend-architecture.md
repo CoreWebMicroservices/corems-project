@@ -1,5 +1,6 @@
 ---
-inclusion: always
+inclusion: fileMatch
+fileMatchPattern: "**/*.java"
 ---
 
 # Backend Architecture - Core Microservices

@@ -1,3 +1,8 @@
+---
+inclusion: fileMatch
+fileMatchPattern: "**/*.java"
+---
+
 # Exception Handling Guidelines
 
 ## Use ServiceException with ExceptionReasonCodes Enum

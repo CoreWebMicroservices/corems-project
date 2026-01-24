@@ -3,6 +3,14 @@ repos/
 target/
 .env
 
+# Kiro specs (local development only)
+.kiro/specs/
+
+# Generated documentation (exclude except README)
+*.md
+!README.md
+!**/README.md
+
 # IDE
 .idea/
 *.iml
