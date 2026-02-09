@@ -62,6 +62,9 @@ spring:
     banner-mode: off
   jackson:
     default-property-inclusion: non_null
+  threads:
+    virtual:
+      enabled: ${VIRTUAL_THREADS_ENABLED:true}
   config:
     import: classpath:db-config.yaml, security-config.yaml
 
@@ -76,6 +79,7 @@ service-name:
 - Always import db-config.yaml and security-config.yaml
 - Banner mode off for cleaner logs
 - Jackson configured to exclude null fields
+- Virtual threads enabled by default (Java 21+ feature for better I/O concurrency)
 
 ### db-config.yaml
 **Location**: `<service>-service/src/main/resources/db-config.yaml`
