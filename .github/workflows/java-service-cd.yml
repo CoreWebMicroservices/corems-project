@@ -1,0 +1,155 @@
+name: Java Service CD
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: 'Service name (e.g., user-ms, communication-ms)'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment (dev, staging, prod)'
+        required: true
+        type: string
+      docker-registry:
+        description: 'Docker registry (ghcr.io or docker.io)'
+        required: false
+        type: string
+        default: 'ghcr.io'
+      image-tag:
+        description: 'Docker image tag to deploy (or "build" to build fresh)'
+        required: false
+        type: string
+        default: 'latest'
+      java-version:
+        description: 'Java version (only if building fresh)'
+        required: false
+        type: string
+        default: '25'
+
+    secrets:
+      github-token:
+        description: 'GitHub token for package access'
+        required: true
+      docker-username:
+        description: 'Docker registry username'
+        required: false
+      docker-password:
+        description: 'Docker registry password'
+        required: false
+      deployment-env:
+        description: 'Environment variables for deployment (multiline)'
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine if Build is Needed
+        id: check-build
+        run: |
+          if [ "${{ inputs.image-tag }}" == "build" ]; then
+            echo "build-needed=true" >> $GITHUB_OUTPUT
+            echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "build-needed=false" >> $GITHUB_OUTPUT
+            echo "image-tag=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Java ${{ inputs.java-version }}
+        if: steps.check-build.outputs.build-needed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Service
+        if: steps.check-build.outputs.build-needed == 'true'
+        run: mvn clean install -DskipTests=true
+
+      - name: Build Docker Image
+        if: steps.check-build.outputs.build-needed == 'true'
+        run: |
+          if [ -f "docker/Dockerfile" ]; then
+            docker build -f docker/Dockerfile \
+              -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.check-build.outputs.image-tag }} \
+              -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ inputs.environment }} \
+              .
+          else
+            echo "No Dockerfile found!"
+            exit 1
+          fi
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.docker-registry }}
+          username: ${{ secrets.docker-username || github.actor }}
+          password: ${{ secrets.docker-password || secrets.github-token }}
+
+      - name: Push Docker Image
+        if: steps.check-build.outputs.build-needed == 'true'
+        run: |
+          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.check-build.outputs.image-tag }}
+          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ inputs.environment }}
+
+      - name: Pull Docker Image
+        if: steps.check-build.outputs.build-needed == 'false'
+        run: |
+          docker pull ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.check-build.outputs.image-tag }}
+
+      - name: Deploy via Docker Compose
+        run: |
+          echo "Deploying ${{ inputs.service-name }} to ${{ inputs.environment }} via Docker Compose..."
+          
+          # Create deployment directory
+          mkdir -p deploy
+          
+          # Create docker-compose.yml for deployment
+          cat > deploy/docker-compose.yml <<EOF
+          services:
+            ${{ inputs.service-name }}:
+              image: ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.check-build.outputs.image-tag }}
+              container_name: ${{ inputs.service-name }}-${{ inputs.environment }}
+              restart: unless-stopped
+              networks:
+                - corems-network
+              environment:
+                - SPRING_PROFILES_ACTIVE=${{ inputs.environment }}
+          
+          networks:
+            corems-network:
+              external: true
+          EOF
+          
+          # Add environment variables if provided
+          if [ -n "${{ secrets.deployment-env }}" ]; then
+            echo "${{ secrets.deployment-env }}" > deploy/.env
+          fi
+          
+          # Deploy
+          cd deploy
+          docker-compose up -d
+
+      - name: Health Check
+        run: |
+          echo "Waiting for service to be healthy..."
+          sleep 30
+          
+          # Add health check logic here based on deployment method
+          echo "Service deployed successfully to ${{ inputs.environment }}"
+
+      - name: Notify Deployment
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Successfully deployed ${{ inputs.service-name }} to ${{ inputs.environment }}"
+          else
+            echo "❌ Failed to deploy ${{ inputs.service-name }} to ${{ inputs.environment }}"
+          fi

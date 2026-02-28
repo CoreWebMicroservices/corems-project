@@ -1,5 +1,6 @@
 # Cloned repositories (each has own .git)
 repos/
+infra/
 target/
 .env
 

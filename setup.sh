@@ -10,6 +10,7 @@ NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_DIR="$SCRIPT_DIR/repos"
+INFRA_DIR="$SCRIPT_DIR/infra"
 DOCKER_DIR="$SCRIPT_DIR/docker"
 GITHUB_ORG="CoreWebMicroservices"
 GITHUB_BASE="https://github.com/$GITHUB_ORG"
@@ -164,6 +165,9 @@ cmd_init() {
     
     mkdir -p "$REPOS_DIR"
     
+    # Clone infrastructure repo
+    clone_infra
+    
     # Clone required repos
     log_info "Cloning required repositories..."
     clone_repo "parent"
@@ -181,6 +185,9 @@ cmd_init_base() {
     log_info "Initializing Core Microservices with base services..."
     
     mkdir -p "$REPOS_DIR"
+    
+    # Clone infrastructure repo
+    clone_infra
     
     # Clone required repos and base services
     log_info "Cloning required repositories and base services..."
@@ -212,6 +219,9 @@ cmd_init_all() {
     log_info "Checking and fetching all available repositories..."
     
     mkdir -p "$REPOS_DIR"
+    
+    # Clone infrastructure repo
+    clone_infra
     
     # List of all known repositories in the CoreWebMicroservices organization
     local all_repos=(
@@ -1163,6 +1173,17 @@ clone_repo() {
     log_info "Cloning $repo_name..."
     git clone "$GITHUB_BASE/$repo_name.git" "$repo_path"
     log_success "Cloned $repo_name"
+}
+
+clone_infra() {
+    if [ -d "$INFRA_DIR" ]; then
+        log_warn "Infrastructure repo already exists, skipping..."
+        return
+    fi
+    
+    log_info "Cloning infrastructure repository..."
+    git clone "$GITHUB_BASE/corems-infra.git" "$INFRA_DIR"
+    log_success "Cloned infrastructure repository"
 }
 
 # -----------------------------------------------------------------------------

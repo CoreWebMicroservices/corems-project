@@ -1,0 +1,71 @@
+# Terraform workflow example
+# Copy this to your infrastructure repository as .github/workflows/terraform.yml
+
+name: Terraform
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  # Plan on PR
+  plan:
+    if: github.event_name == 'pull_request'
+    uses: CoreWebMicroservices/corems-project/.github/workflows/terraform.yml@main
+    with:
+      environment: dev
+      action: plan
+      working-directory: terraform
+    secrets:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      aws-region: ${{ secrets.AWS_REGION }}
+
+  # Apply to dev on main push
+  apply-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: CoreWebMicroservices/corems-project/.github/workflows/terraform.yml@main
+    with:
+      environment: dev
+      action: apply
+      working-directory: terraform
+    secrets:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      aws-region: ${{ secrets.AWS_REGION }}
+
+  # Manual trigger for any environment
+  manual:
+    if: github.event_name == 'workflow_dispatch'
+    uses: CoreWebMicroservices/corems-project/.github/workflows/terraform.yml@main
+    with:
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+      working-directory: terraform
+    secrets:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      aws-region: ${{ secrets.AWS_REGION }}

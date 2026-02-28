@@ -1,0 +1,65 @@
+# Complete CI/CD example for Java microservices
+# Copy this to your service repository as .github/workflows/cicd.yml
+
+name: CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  # Continuous Integration
+  build-and-test:
+    uses: CoreWebMicroservices/corems-project/.github/workflows/java-service-ci.yml@main
+    with:
+      service-name: user-ms  # Change to your service name
+      java-version: '25'
+      
+      # Enable features on main branch only
+      publish-artifacts: ${{ github.ref == 'refs/heads/main' }}
+      build-docker: false  # Build in CD for faster CI
+      push-docker: false
+      run-sonarqube: ${{ github.ref == 'refs/heads/main' }}
+      
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      sonar-token: ${{ secrets.SONAR_TOKEN }}
+
+  # Continuous Deployment - Dev (auto-deploy on main branch)
+  deploy-dev:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: CoreWebMicroservices/corems-project/.github/workflows/java-service-cd.yml@main
+    with:
+      service-name: user-ms  # Change to your service name
+      environment: dev
+      image-tag: build  # Build fresh image during deployment
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      docker-username: ${{ secrets.DOCKER_USERNAME }}
+      docker-password: ${{ secrets.DOCKER_PASSWORD }}
+
+  # Continuous Deployment - Production (manual trigger with approval)
+  deploy-prod:
+    needs: build-and-test
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
+    uses: CoreWebMicroservices/corems-project/.github/workflows/java-service-cd.yml@main
+    with:
+      service-name: user-ms  # Change to your service name
+      environment: prod
+      image-tag: latest  # Use pre-built image from dev
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      docker-username: ${{ secrets.DOCKER_USERNAME }}
+      docker-password: ${{ secrets.DOCKER_PASSWORD }}

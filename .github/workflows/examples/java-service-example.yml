@@ -1,0 +1,32 @@
+# Example CI workflow for Java microservices
+# Minimal configuration - only runs tests
+# Copy this to your service repository as .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    uses: CoreWebMicroservices/corems-project/.github/workflows/java-service-ci.yml@main
+    with:
+      service-name: user-ms  # Change to your service name
+      java-version: '25'
+      
+      # Optional features - enable as needed
+      publish-artifacts: ${{ github.ref == 'refs/heads/main' }}  # Publish on main branch
+      build-docker: false  # Build in CD instead
+      push-docker: false
+      run-sonarqube: false  # Enable if you have SonarQube
+      
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Only needed if enabling optional features:
+      # docker-username: ${{ secrets.DOCKER_USERNAME }}
+      # docker-password: ${{ secrets.DOCKER_PASSWORD }}
+      # sonar-token: ${{ secrets.SONAR_TOKEN }}

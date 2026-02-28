@@ -1,0 +1,30 @@
+# Frontend release workflow - triggered when you create a git tag
+# Copy this to frontend repository as .github/workflows/release.yml
+#
+# Usage:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Workflow will:
+#   - Build production bundle
+#   - Run tests
+#   - Build and push Docker image with version tag
+#   - Create GitHub release
+#   - Upload build artifacts
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    uses: CoreWebMicroservices/corems-project/.github/workflows/frontend-release.yml@main
+    with:
+      node-version: '20'
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      docker-username: ${{ secrets.DOCKER_USERNAME }}
+      docker-password: ${{ secrets.DOCKER_PASSWORD }}

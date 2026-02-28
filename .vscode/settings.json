@@ -10,5 +10,6 @@
     "repos/parent"
   ],
   "search.useGlobalIgnoreFiles": false,
-  "search.useIgnoreFiles": false
+  "search.useIgnoreFiles": false,
+  "java.compile.nullAnalysis.mode": "disabled"
 }

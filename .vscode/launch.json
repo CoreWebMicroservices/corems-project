@@ -3,6 +3,24 @@
     "configurations": [
         {
             "type": "java",
+            "name": "DataAggregatorService",
+            "request": "launch",
+            "mainClass": "DataAggregatorService"
+        },
+        {
+            "type": "java",
+            "name": "PriceProvider",
+            "request": "launch",
+            "mainClass": "PriceProvider"
+        },
+        {
+            "type": "java",
+            "name": "StockMarketApp",
+            "request": "launch",
+            "mainClass": "StockMarketApp"
+        },
+        {
+            "type": "java",
             "name": "User Service",
             "request": "launch",
             "mainClass": "com.corems.userms.app.UserServiceApplication",

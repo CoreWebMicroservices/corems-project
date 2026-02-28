@@ -1,0 +1,190 @@
+name: Java Service CI
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: 'Service name (e.g., user-ms, communication-ms)'
+        required: true
+        type: string
+      java-version:
+        description: 'Java version to use'
+        required: false
+        type: string
+        default: '25'
+      maven-args:
+        description: 'Additional Maven arguments'
+        required: false
+        type: string
+        default: ''
+      publish-artifacts:
+        description: 'Publish Maven artifacts to GitHub Packages'
+        required: false
+        type: boolean
+        default: false
+      build-docker:
+        description: 'Build Docker image'
+        required: false
+        type: boolean
+        default: false
+      push-docker:
+        description: 'Push Docker image to registry'
+        required: false
+        type: boolean
+        default: false
+      run-sonarqube:
+        description: 'Run SonarQube analysis'
+        required: false
+        type: boolean
+        default: false
+      docker-registry:
+        description: 'Docker registry (ghcr.io or docker.io)'
+        required: false
+        type: string
+        default: 'ghcr.io'
+    secrets:
+      github-token:
+        description: 'GitHub token for package access'
+        required: true
+      docker-username:
+        description: 'Docker registry username'
+        required: false
+      docker-password:
+        description: 'Docker registry password'
+        required: false
+      sonar-token:
+        description: 'SonarQube token'
+        required: false
+      sonar-host-url:
+        description: 'SonarQube server URL'
+        required: false
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java ${{ inputs.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build API module
+        run: |
+          if [ -d "${{ inputs.service-name }}-api" ]; then
+            echo "Building API module..."
+            mvn clean install -pl ${{ inputs.service-name }}-api -am -DskipTests=true ${{ inputs.maven-args }}
+          else
+            echo "No API module found, skipping..."
+          fi
+
+      - name: Build Client module
+        run: |
+          if [ -d "${{ inputs.service-name }}-client" ]; then
+            echo "Building Client module..."
+            mvn clean install -pl ${{ inputs.service-name }}-client -am -DskipTests=true ${{ inputs.maven-args }}
+          else
+            echo "No Client module found, skipping..."
+          fi
+
+      - name: Build Service module
+        run: |
+          if [ -d "${{ inputs.service-name }}-service" ]; then
+            echo "Building Service module..."
+            mvn clean install -pl ${{ inputs.service-name }}-service -am -DskipTests=true ${{ inputs.maven-args }}
+          else
+            echo "Building entire project..."
+            mvn clean install -DskipTests=true ${{ inputs.maven-args }}
+          fi
+
+      - name: Run Unit Tests
+        run: mvn test ${{ inputs.maven-args }}
+
+      - name: Run SonarQube Analysis
+        if: inputs.run-sonarqube && secrets.sonar-token != ''
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ inputs.service-name }} \
+            -Dsonar.organization=${{ github.repository_owner }} \
+            -Dsonar.host.url=${{ secrets.sonar-host-url || 'https://sonarcloud.io' }} \
+            -Dsonar.login=${{ secrets.sonar-token }} \
+            ${{ inputs.maven-args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+          SONAR_TOKEN: ${{ secrets.sonar-token }}
+
+      - name: Publish Maven Artifacts to GitHub Packages
+        if: inputs.publish-artifacts && secrets.github-token != ''
+        run: |
+          # Configure Maven settings for GitHub Packages
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.github-token }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+          
+          # Deploy artifacts
+          mvn deploy -DskipTests=true ${{ inputs.maven-args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+
+      - name: Build Docker Image
+        if: inputs.build-docker
+        run: |
+          if [ -f "docker/Dockerfile" ]; then
+            docker build -f docker/Dockerfile -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }} .
+            docker tag ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }} \
+                       ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest
+          else
+            echo "No Dockerfile found, skipping Docker build..."
+          fi
+
+      - name: Log in to Docker Registry
+        if: inputs.push-docker && inputs.build-docker && secrets.docker-password != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.docker-registry }}
+          username: ${{ secrets.docker-username || github.actor }}
+          password: ${{ secrets.docker-password || secrets.github-token }}
+
+      - name: Push Docker Image
+        if: inputs.push-docker && inputs.build-docker
+        run: |
+          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }}
+          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest
+
+      - name: Save Docker Image as Artifact
+        if: inputs.build-docker && !inputs.push-docker
+        run: |
+          docker save ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }} \
+            | gzip > ${{ inputs.service-name }}-${{ github.sha }}.tar.gz
+
+      - name: Upload Docker Image Artifact
+        if: inputs.build-docker && !inputs.push-docker
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ inputs.service-name }}
+          path: ${{ inputs.service-name }}-${{ github.sha }}.tar.gz
+          retention-days: 7
