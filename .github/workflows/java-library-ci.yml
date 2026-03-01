@@ -39,16 +39,11 @@ jobs:
         uses: CoreWebMicroservices/corems-project/.github/actions/setup-maven@main
         with:
           github-token: ${{ secrets.github-token }}
+          github-actor: ${{ github.actor }}
           java-version: ${{ inputs.java-version }}
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build and Install
         run: mvn clean install -DskipTests=true
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Tests
         if: inputs.run-tests
