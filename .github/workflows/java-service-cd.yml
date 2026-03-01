@@ -67,11 +67,28 @@ jobs:
         with:
           java-version: ${{ inputs.java-version }}
           distribution: 'temurin'
-          cache: 'maven'
+
+      - name: Configure Maven for GitHub Packages
+        if: steps.check-build.outputs.build-needed == 'true'
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.github-token }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
 
       - name: Build Service
         if: steps.check-build.outputs.build-needed == 'true'
-        run: mvn clean install -DskipTests=true
+        run: mvn clean install -DskipTests=true -s ~/.m2/settings.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Docker Image
         if: steps.check-build.outputs.build-needed == 'true'

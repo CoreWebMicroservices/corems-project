@@ -92,7 +92,7 @@ jobs:
         run: |
           if [ -d "${{ inputs.service-name }}-api" ]; then
             echo "Building API module..."
-            mvn clean install -pl ${{ inputs.service-name }}-api -am -DskipTests=true ${{ inputs.maven-args }}
+            mvn clean install -pl ${{ inputs.service-name }}-api -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
             echo "No API module found, skipping..."
           fi
@@ -103,7 +103,7 @@ jobs:
         run: |
           if [ -d "${{ inputs.service-name }}-client" ]; then
             echo "Building Client module..."
-            mvn clean install -pl ${{ inputs.service-name }}-client -am -DskipTests=true ${{ inputs.maven-args }}
+            mvn clean install -pl ${{ inputs.service-name }}-client -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
             echo "No Client module found, skipping..."
           fi
@@ -114,16 +114,16 @@ jobs:
         run: |
           if [ -d "${{ inputs.service-name }}-service" ]; then
             echo "Building Service module..."
-            mvn clean install -pl ${{ inputs.service-name }}-service -am -DskipTests=true ${{ inputs.maven-args }}
+            mvn clean install -pl ${{ inputs.service-name }}-service -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
             echo "Building entire project..."
-            mvn clean install -DskipTests=true ${{ inputs.maven-args }}
+            mvn clean install -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Unit Tests
-        run: mvn test ${{ inputs.maven-args }}
+        run: mvn test -s ~/.m2/settings.xml ${{ inputs.maven-args }}
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 

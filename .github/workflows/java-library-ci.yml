@@ -43,18 +43,18 @@ jobs:
           java-version: ${{ inputs.java-version }}
 
       - name: Build and Install
-        run: mvn clean install -DskipTests=true
+        run: mvn clean install -DskipTests=true -s ~/.m2/settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Tests
         if: inputs.run-tests
-        run: mvn test
+        run: mvn test -s ~/.m2/settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Publish to GitHub Packages
         if: inputs.publish-artifacts && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mvn deploy -DskipTests=true
+        run: mvn deploy -DskipTests=true -s ~/.m2/settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
