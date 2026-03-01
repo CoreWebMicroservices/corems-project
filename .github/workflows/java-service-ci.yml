@@ -69,27 +69,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java ${{ inputs.java-version }}
-        uses: actions/setup-java@v4
+      - name: Setup Maven with GitHub Packages
+        uses: CoreWebMicroservices/corems-project/.github/actions/setup-maven@main
         with:
+          github-token: ${{ secrets.github-token }}
           java-version: ${{ inputs.java-version }}
-          distribution: 'temurin'
-          cache: 'maven'
-
-      - name: Configure Maven for GitHub Packages
-        run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml <<EOF
-          <settings>
-            <servers>
-              <server>
-                <id>github</id>
-                <username>${{ github.actor }}</username>
-                <password>${{ secrets.github-token }}</password>
-              </server>
-            </servers>
-          </settings>
-          EOF
 
       - name: Cache Maven dependencies
         uses: actions/cache@v4

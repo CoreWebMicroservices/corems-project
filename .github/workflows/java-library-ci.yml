@@ -1,0 +1,51 @@
+name: Java Library CI
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: 'Java version to use'
+        required: false
+        type: string
+        default: '25'
+      run-tests:
+        description: 'Run tests'
+        required: false
+        type: boolean
+        default: true
+      publish-artifacts:
+        description: 'Publish to GitHub Packages on main branch'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      github-token:
+        description: 'GitHub token for package access'
+        required: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Maven with GitHub Packages
+        uses: CoreWebMicroservices/corems-project/.github/actions/setup-maven@main
+        with:
+          github-token: ${{ secrets.github-token }}
+          java-version: ${{ inputs.java-version }}
+
+      - name: Build and Install
+        run: mvn clean install -DskipTests=true
+
+      - name: Run Tests
+        if: inputs.run-tests
+        run: mvn test
+
+      - name: Publish to GitHub Packages
+        if: inputs.publish-artifacts && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: mvn deploy -DskipTests=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
