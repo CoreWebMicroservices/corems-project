@@ -15,6 +15,12 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Set up Java ${{ inputs.java-version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: 'temurin'
+
     - name: Configure Maven for GitHub Packages
       shell: bash
       env:
@@ -33,10 +39,5 @@ runs:
           </servers>
         </settings>
         EOF
-
-    - name: Set up Java ${{ inputs.java-version }}
-      uses: actions/setup-java@v4
-      with:
-        java-version: ${{ inputs.java-version }}
-        distribution: 'temurin'
-        cache: 'maven'
+        echo "Settings.xml created. Verifying (without password):"
+        cat ~/.m2/settings.xml | grep -v password
