@@ -44,10 +44,14 @@ jobs:
 
       - name: Build and Install
         run: mvn clean install -DskipTests=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Tests
         if: inputs.run-tests
         run: mvn test
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Publish to GitHub Packages
         if: inputs.publish-artifacts && github.event_name == 'push' && github.ref == 'refs/heads/main'

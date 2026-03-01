@@ -96,6 +96,8 @@ jobs:
           else
             echo "No API module found, skipping..."
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Client module
         run: |
@@ -105,6 +107,8 @@ jobs:
           else
             echo "No Client module found, skipping..."
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Service module
         run: |
@@ -115,9 +119,13 @@ jobs:
             echo "Building entire project..."
             mvn clean install -DskipTests=true ${{ inputs.maven-args }}
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Unit Tests
         run: mvn test ${{ inputs.maven-args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run SonarQube Analysis
         if: inputs.run-sonarqube
