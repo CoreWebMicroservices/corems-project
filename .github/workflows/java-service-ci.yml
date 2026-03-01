@@ -116,7 +116,7 @@ jobs:
         run: mvn test ${{ inputs.maven-args }}
 
       - name: Run SonarQube Analysis
-        if: inputs.run-sonarqube && secrets.sonar-token != ''
+        if: inputs.run-sonarqube
         run: |
           mvn sonar:sonar \
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ inputs.service-name }} \
@@ -129,7 +129,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.sonar-token }}
 
       - name: Publish Maven Artifacts to GitHub Packages
-        if: inputs.publish-artifacts && secrets.github-token != ''
+        if: inputs.publish-artifacts
         run: |
           # Configure Maven settings for GitHub Packages
           mkdir -p ~/.m2
@@ -162,7 +162,7 @@ jobs:
           fi
 
       - name: Log in to Docker Registry
-        if: inputs.push-docker && inputs.build-docker && secrets.docker-password != ''
+        if: inputs.push-docker && inputs.build-docker
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.docker-registry }}

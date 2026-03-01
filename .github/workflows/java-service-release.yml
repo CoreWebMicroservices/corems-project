@@ -120,7 +120,6 @@ jobs:
           fi
 
       - name: Log in to Docker Registry
-        if: secrets.docker-password != ''
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.docker-registry }}
