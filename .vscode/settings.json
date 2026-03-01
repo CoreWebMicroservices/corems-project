@@ -11,5 +11,6 @@
   ],
   "search.useGlobalIgnoreFiles": false,
   "search.useIgnoreFiles": false,
-  "java.compile.nullAnalysis.mode": "disabled"
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.configuration.updateBuildConfiguration": "automatic"
 }

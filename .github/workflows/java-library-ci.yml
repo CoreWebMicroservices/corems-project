@@ -40,9 +40,15 @@ jobs:
         with:
           github-token: ${{ secrets.github-token }}
           java-version: ${{ inputs.java-version }}
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build and Install
         run: mvn clean install -DskipTests=true
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Tests
         if: inputs.run-tests
