@@ -23,6 +23,10 @@ on:
         description: 'GitHub token for package access'
         required: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
