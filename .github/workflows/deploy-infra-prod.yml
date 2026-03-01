@@ -1,0 +1,36 @@
+name: Deploy Infrastructure - Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+
+jobs:
+  deploy-prod:
+    name: Deploy to Prod Environment
+    uses: ./.github/workflows/terraform.yml
+    with:
+      working-directory: 'infra'
+      environment: 'prod'
+      action: ${{ github.event.inputs.action }}
+      terraform-version: '1.6.0'
+      aws-region: 'eu-north-1'
+      # Prod-specific settings (larger, more reliable)
+      db-instance-class: 'db.t3.small'
+      service-cpu: 512
+      service-memory: 1024
+      service-count: 3
+    secrets:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+      db-master-password: ${{ secrets.DB_PASSWORD_PROD }}
+      mq-password: ${{ secrets.MQ_PASSWORD_PROD }}
+      jwt-secret: ${{ secrets.JWT_SECRET_PROD }}
