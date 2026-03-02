@@ -17,16 +17,26 @@ on:
         required: false
         type: string
         default: ''
-      publish-artifacts:
-        description: 'Publish Maven artifacts to GitHub Packages'
+      build-api:
+        description: 'Build API module'
         required: false
         type: boolean
-        default: false
-      publish-clients:
-        description: 'Publish API and Client modules to GitHub Packages (for cross-service dependencies)'
+        default: true
+      build-client:
+        description: 'Build Client module'
         required: false
         type: boolean
-        default: false
+        default: true
+      build-service:
+        description: 'Build Service module'
+        required: false
+        type: boolean
+        default: true
+      run-tests:
+        description: 'Run unit tests'
+        required: false
+        type: boolean
+        default: true
       build-docker:
         description: 'Build Docker image'
         required: false
@@ -98,8 +108,10 @@ jobs:
           echo "=== Workflow Configuration ==="
           echo "Service Name: ${{ inputs.service-name }}"
           echo "Java Version: ${{ inputs.java-version }}"
-          echo "Publish Clients: ${{ inputs.publish-clients }}"
-          echo "Publish Artifacts: ${{ inputs.publish-artifacts }}"
+          echo "Build API: ${{ inputs.build-api }}"
+          echo "Build Client: ${{ inputs.build-client }}"
+          echo "Build Service: ${{ inputs.build-service }}"
+          echo "Run Tests: ${{ inputs.run-tests }}"
           echo "Build Docker: ${{ inputs.build-docker }}"
           echo "Push Docker: ${{ inputs.push-docker }}"
           echo "Run SonarQube: ${{ inputs.run-sonarqube }}"
@@ -108,6 +120,7 @@ jobs:
           echo "=============================="
 
       - name: Build API module
+        if: inputs.build-api
         run: |
           # Extract base service name (remove -ms suffix if present)
           SERVICE_BASE="${{ inputs.service-name }}"
@@ -123,6 +136,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Client module
+        if: inputs.build-client
         run: |
           # Extract base service name (remove -ms suffix if present)
           SERVICE_BASE="${{ inputs.service-name }}"
@@ -138,7 +152,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Publish API and Client Modules to GitHub Packages
-        if: inputs.publish-clients && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (inputs.build-api || inputs.build-client) && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           echo "Publishing API and Client modules to GitHub Packages..."
           
@@ -146,25 +160,22 @@ jobs:
           SERVICE_BASE="${{ inputs.service-name }}"
           SERVICE_BASE="${SERVICE_BASE%-ms}"
           
-          # Publish API module if exists
-          if [ -d "${SERVICE_BASE}-api" ]; then
+          # Publish API module if it was built
+          if [ "${{ inputs.build-api }}" == "true" ] && [ -d "${SERVICE_BASE}-api" ]; then
             echo "Publishing ${SERVICE_BASE}-api module..."
             mvn deploy -pl ${SERVICE_BASE}-api -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
-          else
-            echo "No ${SERVICE_BASE}-api module found, skipping..."
           fi
           
-          # Publish Client module if exists
-          if [ -d "${SERVICE_BASE}-client" ]; then
+          # Publish Client module if it was built
+          if [ "${{ inputs.build-client }}" == "true" ] && [ -d "${SERVICE_BASE}-client" ]; then
             echo "Publishing ${SERVICE_BASE}-client module..."
             mvn deploy -pl ${SERVICE_BASE}-client -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
-          else
-            echo "No ${SERVICE_BASE}-client module found, skipping..."
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Service module
+        if: inputs.build-service
         run: |
           # Extract base service name (remove -ms suffix if present)
           SERVICE_BASE="${{ inputs.service-name }}"
@@ -181,6 +192,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Run Unit Tests
+        if: inputs.run-tests
         run: mvn test -s ~/.m2/settings.xml ${{ inputs.maven-args }}
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
@@ -197,12 +209,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
           SONAR_TOKEN: ${{ secrets.sonar-token }}
-
-      - name: Publish Maven Artifacts to GitHub Packages
-        if: inputs.publish-artifacts
-        run: mvn deploy -DskipTests=true ${{ inputs.maven-args }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Docker Image
         if: inputs.build-docker
