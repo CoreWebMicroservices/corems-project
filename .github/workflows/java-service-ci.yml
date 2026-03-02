@@ -208,9 +208,10 @@ jobs:
         if: inputs.build-docker
         run: |
           if [ -f "docker/Dockerfile" ]; then
-            docker build -f docker/Dockerfile -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }} .
-            docker tag ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }} \
-                       ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest
+            OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            docker build -f docker/Dockerfile -t ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:${{ github.sha }} .
+            docker tag ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:${{ github.sha }} \
+                       ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:latest
           else
             echo "No Dockerfile found, skipping Docker build..."
           fi
@@ -226,8 +227,9 @@ jobs:
       - name: Push Docker Image
         if: inputs.push-docker && inputs.build-docker
         run: |
-          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ github.sha }}
-          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker push ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:${{ github.sha }}
+          docker push ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:latest
 
       - name: Save Docker Image as Artifact
         if: inputs.build-docker && !inputs.push-docker

@@ -113,9 +113,10 @@ jobs:
       - name: Build Docker Image
         run: |
           if [ -f "docker/Dockerfile" ]; then
+            OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             docker build -f docker/Dockerfile \
-              -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.version.outputs.version }} \
-              -t ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest \
+              -t ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:${{ steps.version.outputs.version }} \
+              -t ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:latest \
               .
           fi
 
@@ -128,8 +129,9 @@ jobs:
 
       - name: Push Docker Image
         run: |
-          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.version.outputs.version }}
-          docker push ${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:latest
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker push ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:${{ steps.version.outputs.version }}
+          docker push ${{ inputs.docker-registry }}/${OWNER_LOWER}/${{ inputs.service-name }}:latest
 
       - name: Bump to next SNAPSHOT version
         run: |
@@ -159,6 +161,8 @@ jobs:
             ### Artifacts
             - Maven: `com.corems.${{ inputs.service-name }}:*:${{ steps.version.outputs.version }}`
             - Docker: `${{ inputs.docker-registry }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.version.outputs.version }}`
+            
+            Note: Docker image name is lowercase in registry.
             
             ### Next Development Version
             - `${{ steps.version.outputs.next_snapshot }}`
