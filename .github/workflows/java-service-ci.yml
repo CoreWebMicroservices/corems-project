@@ -137,27 +137,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
-      - name: Build Service module
-        run: |
-          # Extract base service name (remove -ms suffix if present)
-          SERVICE_BASE="${{ inputs.service-name }}"
-          SERVICE_BASE="${SERVICE_BASE%-ms}"
-          
-          if [ -d "${SERVICE_BASE}-service" ]; then
-            echo "Building ${SERVICE_BASE}-service module..."
-            mvn clean install -pl ${SERVICE_BASE}-service -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
-          else
-            echo "Building entire project..."
-            mvn clean install -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.github-token }}
-
-      - name: Run Unit Tests
-        run: mvn test -s ~/.m2/settings.xml ${{ inputs.maven-args }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.github-token }}
-
       - name: Publish API and Client Modules to GitHub Packages
         if: inputs.publish-clients && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -182,6 +161,27 @@ jobs:
           else
             echo "No ${SERVICE_BASE}-client module found, skipping..."
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+
+      - name: Build Service module
+        run: |
+          # Extract base service name (remove -ms suffix if present)
+          SERVICE_BASE="${{ inputs.service-name }}"
+          SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
+          if [ -d "${SERVICE_BASE}-service" ]; then
+            echo "Building ${SERVICE_BASE}-service module..."
+            mvn clean install -pl ${SERVICE_BASE}-service -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          else
+            echo "Building entire project..."
+            mvn clean install -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+
+      - name: Run Unit Tests
+        run: mvn test -s ~/.m2/settings.xml ${{ inputs.maven-args }}
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
