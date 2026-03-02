@@ -151,14 +151,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
-      - name: Publish API and Client Modules to GitHub Packages
+      - name: Publish Parent POM and Client Modules to GitHub Packages
         if: (inputs.build-api || inputs.build-client) && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          echo "Publishing API and Client modules to GitHub Packages..."
+          echo "Publishing Parent POM and Client modules to GitHub Packages..."
           
           # Extract base service name (remove -ms suffix if present)
           SERVICE_BASE="${{ inputs.service-name }}"
           SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
+          # First, publish the parent POM (required for dependency resolution)
+          echo "Publishing parent POM..."
+          mvn deploy:deploy-file \
+            -DgroupId=com.corems.${SERVICE_BASE}ms \
+            -DartifactId=${{ inputs.service-name }} \
+            -Dversion=0.0.1-SNAPSHOT \
+            -Dpackaging=pom \
+            -Dfile=pom.xml \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/CoreWebMicroservices/corems-project \
+            -s ~/.m2/settings.xml
           
           # Publish API module if it was built
           if [ "${{ inputs.build-api }}" == "true" ] && [ -d "${SERVICE_BASE}-api" ]; then
