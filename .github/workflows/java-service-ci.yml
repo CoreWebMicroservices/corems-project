@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish-clients:
+        description: 'Publish API and Client modules to GitHub Packages (for cross-service dependencies)'
+        required: false
+        type: boolean
+        default: false
       build-docker:
         description: 'Build Docker image'
         required: false
@@ -124,6 +129,25 @@ jobs:
 
       - name: Run Unit Tests
         run: mvn test -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+
+      - name: Publish API and Client Modules to GitHub Packages
+        if: inputs.publish-clients && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "Publishing API and Client modules to GitHub Packages..."
+          
+          # Publish API module if exists
+          if [ -d "${{ inputs.service-name }}-api" ]; then
+            echo "Publishing API module..."
+            mvn deploy -pl ${{ inputs.service-name }}-api -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          fi
+          
+          # Publish Client module if exists
+          if [ -d "${{ inputs.service-name }}-client" ]; then
+            echo "Publishing Client module..."
+            mvn deploy -pl ${{ inputs.service-name }}-client -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
