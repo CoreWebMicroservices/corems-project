@@ -160,28 +160,29 @@ jobs:
           SERVICE_BASE="${{ inputs.service-name }}"
           SERVICE_BASE="${SERVICE_BASE%-ms}"
           
-          # First, publish the parent POM (required for dependency resolution)
-          echo "Publishing parent POM..."
-          mvn deploy:deploy-file \
-            -DgroupId=com.corems.${SERVICE_BASE}ms \
-            -DartifactId=${{ inputs.service-name }} \
-            -Dversion=0.0.1-SNAPSHOT \
-            -Dpackaging=pom \
-            -Dfile=pom.xml \
-            -DrepositoryId=github \
-            -Durl=https://maven.pkg.github.com/CoreWebMicroservices/corems-project \
-            -s ~/.m2/settings.xml
+          # Build list of modules to publish
+          MODULES=""
           
-          # Publish API module if it was built
           if [ "${{ inputs.build-api }}" == "true" ] && [ -d "${SERVICE_BASE}-api" ]; then
-            echo "Publishing ${SERVICE_BASE}-api module..."
-            mvn deploy -pl ${SERVICE_BASE}-api -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+            MODULES="${MODULES},${SERVICE_BASE}-api"
+            echo "Will publish ${SERVICE_BASE}-api module"
           fi
           
-          # Publish Client module if it was built
           if [ "${{ inputs.build-client }}" == "true" ] && [ -d "${SERVICE_BASE}-client" ]; then
-            echo "Publishing ${SERVICE_BASE}-client module..."
-            mvn deploy -pl ${SERVICE_BASE}-client -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+            MODULES="${MODULES},${SERVICE_BASE}-client"
+            echo "Will publish ${SERVICE_BASE}-client module"
+          fi
+          
+          # Remove leading comma
+          MODULES="${MODULES#,}"
+          
+          if [ -n "$MODULES" ]; then
+            echo "Publishing parent POM and modules: $MODULES"
+            # Deploy parent POM and specified modules in one command
+            # This ensures parent POM is published along with the modules
+            mvn deploy -pl "$MODULES" -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          else
+            echo "No modules to publish"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
