@@ -95,31 +95,43 @@ jobs:
 
       - name: Build API module
         run: |
-          if [ -d "${{ inputs.service-name }}-api" ]; then
-            echo "Building API module..."
-            mvn clean install -pl ${{ inputs.service-name }}-api -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          # Extract base service name (remove -ms suffix if present)
+          SERVICE_BASE="${{ inputs.service-name }}"
+          SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
+          if [ -d "${SERVICE_BASE}-api" ]; then
+            echo "Building ${SERVICE_BASE}-api module..."
+            mvn clean install -pl ${SERVICE_BASE}-api -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
-            echo "No API module found, skipping..."
+            echo "No ${SERVICE_BASE}-api module found, skipping..."
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Client module
         run: |
-          if [ -d "${{ inputs.service-name }}-client" ]; then
-            echo "Building Client module..."
-            mvn clean install -pl ${{ inputs.service-name }}-client -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          # Extract base service name (remove -ms suffix if present)
+          SERVICE_BASE="${{ inputs.service-name }}"
+          SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
+          if [ -d "${SERVICE_BASE}-client" ]; then
+            echo "Building ${SERVICE_BASE}-client module..."
+            mvn clean install -pl ${SERVICE_BASE}-client -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
-            echo "No Client module found, skipping..."
+            echo "No ${SERVICE_BASE}-client module found, skipping..."
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Build Service module
         run: |
-          if [ -d "${{ inputs.service-name }}-service" ]; then
-            echo "Building Service module..."
-            mvn clean install -pl ${{ inputs.service-name }}-service -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          # Extract base service name (remove -ms suffix if present)
+          SERVICE_BASE="${{ inputs.service-name }}"
+          SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
+          if [ -d "${SERVICE_BASE}-service" ]; then
+            echo "Building ${SERVICE_BASE}-service module..."
+            mvn clean install -pl ${SERVICE_BASE}-service -am -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
           else
             echo "Building entire project..."
             mvn clean install -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
@@ -137,16 +149,24 @@ jobs:
         run: |
           echo "Publishing API and Client modules to GitHub Packages..."
           
+          # Extract base service name (remove -ms suffix if present)
+          SERVICE_BASE="${{ inputs.service-name }}"
+          SERVICE_BASE="${SERVICE_BASE%-ms}"
+          
           # Publish API module if exists
-          if [ -d "${{ inputs.service-name }}-api" ]; then
-            echo "Publishing API module..."
-            mvn deploy -pl ${{ inputs.service-name }}-api -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          if [ -d "${SERVICE_BASE}-api" ]; then
+            echo "Publishing ${SERVICE_BASE}-api module..."
+            mvn deploy -pl ${SERVICE_BASE}-api -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          else
+            echo "No ${SERVICE_BASE}-api module found, skipping..."
           fi
           
           # Publish Client module if exists
-          if [ -d "${{ inputs.service-name }}-client" ]; then
-            echo "Publishing Client module..."
-            mvn deploy -pl ${{ inputs.service-name }}-client -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          if [ -d "${SERVICE_BASE}-client" ]; then
+            echo "Publishing ${SERVICE_BASE}-client module..."
+            mvn deploy -pl ${SERVICE_BASE}-client -DskipTests=true -s ~/.m2/settings.xml ${{ inputs.maven-args }}
+          else
+            echo "No ${SERVICE_BASE}-client module found, skipping..."
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
