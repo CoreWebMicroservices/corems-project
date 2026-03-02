@@ -93,6 +93,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      - name: Display Workflow Configuration
+        run: |
+          echo "=== Workflow Configuration ==="
+          echo "Service Name: ${{ inputs.service-name }}"
+          echo "Java Version: ${{ inputs.java-version }}"
+          echo "Publish Clients: ${{ inputs.publish-clients }}"
+          echo "Publish Artifacts: ${{ inputs.publish-artifacts }}"
+          echo "Build Docker: ${{ inputs.build-docker }}"
+          echo "Push Docker: ${{ inputs.push-docker }}"
+          echo "Run SonarQube: ${{ inputs.run-sonarqube }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "=============================="
+
       - name: Build API module
         run: |
           # Extract base service name (remove -ms suffix if present)
