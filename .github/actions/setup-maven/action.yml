@@ -41,3 +41,4 @@ runs:
         EOF
         echo "Settings.xml created. Verifying (without password):"
         cat ~/.m2/settings.xml | grep -v password
+  
