@@ -152,7 +152,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.github-token }}
 
       - name: Publish Parent POM and Client Modules to GitHub Packages
-        if: (inputs.build-api || inputs.build-client) && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (inputs.build-api || inputs.build-client) && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')
         run: |
           echo "Publishing Parent POM and Client modules to GitHub Packages..."
           
